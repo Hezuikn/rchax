@@ -5,5 +5,5 @@ edition = "2021"
 [dependencies]
 jetscii = "*"
 procfs = "*"
-hex = "*"
 rayon = "*"
+hex-literal = "*"
