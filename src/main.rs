@@ -4,7 +4,7 @@ use hex_literal::hex;
 use procfs::process::{MemoryMap, Process};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
-	collections::HashMap,
+	collections::HashSet,
 	default::default,
 	fs::{File, OpenOptions},
 	os::unix::prelude::FileExt,
@@ -60,7 +60,7 @@ fn main() {
 struct State {
 	proc: Process,
 	mem: File,
-	dry: HashMap<&'static [u8], ()>,
+	dry: HashSet<&'static [u8]>,
 	retry: bool,
 }
 
@@ -87,12 +87,12 @@ impl State {
 		}
 	}
 	fn replace(&mut self, org: &'static [u8], patch: &[u8], dont_retry: bool) {
-		if self.dry.contains_key(org) {
+		if self.dry.contains(org) {
 			return;
 		}
 		if let Some((pos, _map)) = scan(&self.proc, org) {
 			self.mem.write_all_at(patch, pos).unwrap();
-			assert!(self.dry.insert(org, ()).is_none());
+			assert!(self.dry.insert(org));
 			return;
 		}
 		self.retry = true && !dont_retry;
