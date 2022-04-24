@@ -7,3 +7,4 @@ jetscii = "*"
 procfs = "*"
 rayon = "*"
 hex-literal = "*"
+clap = { version = "*", features = ["derive"] }
