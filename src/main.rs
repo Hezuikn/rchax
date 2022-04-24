@@ -1,3 +1,5 @@
+#![feature(thread_local)]
+
 use procfs::process::{MemoryMap, Process};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{env, fs::OpenOptions, os::unix::prelude::FileExt};
@@ -70,19 +72,28 @@ fn main() {
 	println!("all done!");
 }
 
+#[thread_local]
+static mut TLS_BUF: Vec<u8> = Vec::new();
+
 fn scan(proc: &Process, pattern: &[u8]) -> Option<(u64, MemoryMap)> {
 	let pid = proc.pid;
 	let mem = OpenOptions::new()
 		.read(true)
 		.open(format!("/proc/{pid}/mem"))
 		.unwrap();
-	//todo thread local buffer
 	return proc.maps().unwrap().into_par_iter().find_map_first(|map| {
 		let (start, end) = map.address;
-		let size = end - start;
-		let mut buf = vec![0; size as usize];
-		if let Ok(_) = mem.read_exact_at(buf.as_mut_slice(), start) {
-			if let Some(x) = jetscii::ByteSubstring::new(pattern).find(&buf) {
+		let size = (end - start).try_into().unwrap();
+		unsafe {
+			if !(size > TLS_BUF.len()) {
+				TLS_BUF.truncate(size);
+			} else {
+				TLS_BUF.reserve(size - TLS_BUF.len())
+			}
+			TLS_BUF.set_len(size);
+		}
+		if let Ok(_) = mem.read_exact_at(unsafe { TLS_BUF.as_mut_slice() }, start) {
+			if let Some(x) = jetscii::ByteSubstring::new(pattern).find(unsafe { &TLS_BUF }) {
 				return Some((x as u64 + start, map));
 			}
 		}
